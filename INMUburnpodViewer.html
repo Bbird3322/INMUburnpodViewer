@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Solana Wallet Token Balance</title>
+  </head>
+  <body>
+    <h1>Balance Viewer</h1>
+
+    <label>Owner:</label>
+    <input id="owner" size="50" value="BURN8nuem6hnVatDzTTMV98WaBdL3QhU3XCxNDJCHSp5" />
+    <br />
+
+    <label>Mint:</label>
+    <input id="mint" size="60" value="4FDtAagigMuFcPp36rbd9bzcYTJgQah2qLMYcYtfpump" />
+    <br />
+
+    <button id="btn">Fetch</button>
+
+    <pre id="out"></pre>
+
+    <script>
+      const out = document.getElementById("out");
+      document.getElementById("btn").onclick = async () => {
+        out.textContent = "loading...";
+        const owner = document.getElementById("owner").value.trim();
+        const mint = document.getElementById("mint").value.trim();
+        const r = await fetch(`/api/balance?owner=${encodeURIComponent(owner)}&mint=${encodeURIComponent(mint)}`);
+        out.textContent = JSON.stringify(await r.json(), null, 2);
+      };
+    </script>
+  </body>
+</html>
