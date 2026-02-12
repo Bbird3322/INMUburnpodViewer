@@ -1,33 +1,579 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Solana Wallet Token Balance</title>
-  </head>
-  <body>
-    <h1>Balance Viewer</h1>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>トークン残高ビューア</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <label>Owner:</label>
-    <input id="owner" size="50" value="BURN8nuem6hnVatDzTTMV98WaBdL3QhU3XCxNDJCHSp5" />
-    <br />
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            padding: 20px;
+        }
 
-    <label>Mint:</label>
-    <input id="mint" size="60" value="4FDtAagigMuFcPp36rbd9bzcYTJgQah2qLMYcYtfpump" />
-    <br />
+        .container {
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
 
-    <button id="btn">Fetch</button>
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
 
-    <pre id="out"></pre>
+        .subtitle {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
 
+        .furnace-container {
+            position: relative;
+            margin: 40px auto;
+            width: 320px;
+            height: 400px;
+        }
+
+        .furnace {
+            width: 280px;
+            height: 320px;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 40% 40% 50% 50% / 30% 30% 70% 70%;
+            position: relative;
+            box-shadow: 
+                0 20px 60px rgba(0,0,0,0.6),
+                inset 0 -20px 40px rgba(0,0,0,0.5);
+            border: 12px solid #3a3a3a;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        /* 大釜の取っ手 */
+        .furnace::before,
+        .furnace::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 80px;
+            background: linear-gradient(90deg, #3a3a3a, #2a2a2a);
+            border: 6px solid #4a4a4a;
+            border-radius: 50%;
+            top: 20px;
+        }
+
+        .furnace::before {
+            left: -35px;
+            border-right: none;
+        }
+
+        .furnace::after {
+            right: -35px;
+            border-left: none;
+        }
+
+        .furnace-inner {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 40% 40% 50% 50% / 30% 30% 70% 70%;
+            overflow: hidden;
+            background: #0a0a0a;
+        }
+
+        /* 溶けた液体（残高に応じて高さが変わる） */
+        .liquid {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 0%;
+            background: linear-gradient(180deg, 
+                rgba(255, 215, 0, 0.9) 0%,
+                rgba(255, 165, 0, 0.95) 50%,
+                rgba(255, 140, 0, 1) 100%);
+            transition: height 1s ease-out;
+            border-radius: 50% 50% 0 0 / 20% 20% 0 0;
+            box-shadow: 
+                0 -5px 30px rgba(255, 215, 0, 0.5),
+                inset 0 -10px 20px rgba(255, 100, 0, 0.3);
+            animation: bubble 3s ease-in-out infinite;
+        }
+
+        @keyframes bubble {
+            0%, 100% { 
+                border-radius: 50% 50% 0 0 / 20% 20% 0 0;
+            }
+            50% { 
+                border-radius: 45% 55% 0 0 / 25% 15% 0 0;
+            }
+        }
+
+        /* 液面の輝き */
+        .liquid::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 10%;
+            right: 10%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            filter: blur(2px);
+        }
+
+        /* 泡のエフェクト */
+        .liquid::after {
+            content: '';
+            position: absolute;
+            top: 5%;
+            left: 20%;
+            width: 15px;
+            height: 15px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.4), transparent);
+            border-radius: 50%;
+            animation: bubbleRise 3s ease-in-out infinite;
+        }
+
+        @keyframes bubbleRise {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 0;
+            }
+            50% {
+                opacity: 0.6;
+            }
+            100% {
+                transform: translateY(-30px) scale(0.5);
+                opacity: 0;
+            }
+        }
+
+        /* 目盛り線 */
+        .scale-line {
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.3);
+            z-index: 5;
+        }
+
+        .scale-line.target {
+            background: rgba(255, 50, 50, 0.8);
+            height: 3px;
+            box-shadow: 0 0 10px rgba(255, 50, 50, 0.5);
+        }
+
+        .scale-label {
+            position: absolute;
+            right: -50px;
+            top: -8px;
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+        }
+
+        .scale-label.target {
+            color: rgba(255, 100, 100, 1);
+            font-weight: bold;
+        }
+
+        .flame {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 50px;
+            background: linear-gradient(to top, #ff6b00, #ffaa00, #ffff00);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            opacity: 0.6;
+            animation: gentleFlicker 2s ease-in-out infinite;
+            filter: blur(2px);
+        }
+
+        .flame.intense {
+            width: 80px;
+            height: 120px;
+            opacity: 0.9;
+            animation: intenseFlicker 0.8s ease-in-out infinite;
+        }
+
+        .flame::before {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 25px;
+            height: 35px;
+            background: linear-gradient(to top, #ffaa00, #ffff00, #ffffff);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            filter: blur(1px);
+        }
+
+        .flame.intense::before {
+            width: 50px;
+            height: 70px;
+        }
+
+        @keyframes gentleFlicker {
+            0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.6; }
+            50% { transform: translateX(-50%) scale(1.05, 0.95); opacity: 0.7; }
+        }
+
+        @keyframes intenseFlicker {
+            0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.9; }
+            25% { transform: translateX(-50%) scale(1.15, 0.9); opacity: 1; }
+            75% { transform: translateX(-50%) scale(0.95, 1.1); opacity: 0.95; }
+        }
+
+        .coin-container {
+            position: absolute;
+            top: -50px;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .coin {
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle at 30% 30%, #fffacd, #ffd700, #daa520);
+            border-radius: 50%;
+            border: 3px solid #b8860b;
+            position: absolute;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+            animation: coinFallAndMelt 2s ease-out forwards;
+        }
+
+        @keyframes coinFallAndMelt {
+            0% {
+                transform: translateY(0) rotate(0deg) scale(1);
+                opacity: 1;
+            }
+            60% {
+                transform: translateY(250px) rotate(720deg) scale(1);
+                opacity: 1;
+            }
+            80% {
+                transform: translateY(280px) rotate(900deg) scale(0.8);
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(300px) rotate(1080deg) scale(0.3);
+                opacity: 0;
+            }
+        }
+
+        .balance-display {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .balance-label {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .balance-amount {
+            font-size: 3em;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin: 10px 0;
+        }
+
+        .loading {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+
+        .error {
+            color: #ff6b6b;
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+
+        .links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .link-button {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .link-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .refresh-btn {
+            background: rgba(255, 215, 0, 0.3);
+            backdrop-filter: blur(10px);
+            color: white;
+            border: 2px solid rgba(255, 215, 0, 0.5);
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 215, 0, 0.5);
+            transform: scale(1.05);
+        }
+
+        .last-updated {
+            margin-top: 15px;
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2em; }
+            .furnace-container { width: 280px; height: 350px; }
+            .furnace { width: 240px; height: 280px; }
+            .furnace::before,
+            .furnace::after {
+                width: 30px;
+                height: 60px;
+            }
+            .furnace::before { left: -25px; }
+            .furnace::after { right: -25px; }
+            .balance-amount { font-size: 2.5em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧙‍♀️ 魔女の大釜モニター 🔥</h1>
+        <p class="subtitle">Witch's Cauldron - Token Melting Tracker</p>
+
+        <div class="furnace-container">
+            <div class="furnace">
+                <div class="furnace-inner">
+                    <div class="flame" id="flame"></div>
+                    <div class="liquid" id="liquid"></div>
+                    <!-- 目盛り線 -->
+                    <div class="scale-line target" style="bottom: 80%;">
+                        <div class="scale-label target">目標ライン</div>
+                    </div>
+                    <div class="scale-line" style="bottom: 50%;">
+                        <div class="scale-label">50%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="coin-container" id="coinContainer"></div>
+        </div>
+
+        <div class="balance-display">
+            <div class="balance-label">現在の残高</div>
+            <div class="balance-amount" id="balance">読み込み中...</div>
+            <div class="error" id="error" style="display:none;"></div>
+            <div class="last-updated" id="lastUpdated"></div>
+        </div>
+
+        <button class="refresh-btn" onclick="fetchBalance()">🔄 更新</button>
+
+        <div class="links">
+            <a href="https://solscan.io/account/BURN8nuem6hnVatDzTTMV98WaBdL3QhU3XCxNDJCHSp5" 
+               target="_blank" 
+               class="link-button">
+                📊 ウォレットを見る
+            </a>
+            <a href="https://solscan.io/token/4FDtAagigMuFcPp36rbd9bzcYTJgQah2qLMYcYtfpump" 
+               target="_blank" 
+               class="link-button">
+                🪙 トークンを見る
+            </a>
+        </div>
+    </div>
+
+    <!-- Solana Web3.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    
     <script>
-      const out = document.getElementById("out");
-      document.getElementById("btn").onclick = async () => {
-        out.textContent = "loading...";
-        const owner = document.getElementById("owner").value.trim();
-        const mint = document.getElementById("mint").value.trim();
-        const r = await fetch(`/api/balance?owner=${encodeURIComponent(owner)}&mint=${encodeURIComponent(mint)}`);
-        out.textContent = JSON.stringify(await r.json(), null, 2);
-      };
+        // 固定されたアドレス（変更不可）
+        const WALLET_ADDRESS = 'BURN8nuem6hnVatDzTTMV98WaBdL3QhU3XCxNDJCHSp5';
+        const TOKEN_ADDRESS = '4FDtAagigMuFcPp36rbd9bzcYTJgQah2qLMYcYtfpump';
+        
+        let previousBalance = 0;
+        const TARGET_BALANCE = 1000000; // 目標残高（適宜調整してください）
+
+        // Solana接続設定
+        const connection = new solanaWeb3.Connection(
+            'https://api.mainnet-beta.solana.com',
+            'confirmed'
+        );
+
+        async function fetchBalance() {
+            const balanceElement = document.getElementById('balance');
+            const errorElement = document.getElementById('error');
+            const lastUpdatedElement = document.getElementById('lastUpdated');
+            const liquidElement = document.getElementById('liquid');
+            const flameElement = document.getElementById('flame');
+            
+            balanceElement.textContent = '読み込み中...';
+            errorElement.style.display = 'none';
+
+            try {
+                // ウォレットのPublicKeyを作成
+                const walletPublicKey = new solanaWeb3.PublicKey(WALLET_ADDRESS);
+                const tokenMintPublicKey = new solanaWeb3.PublicKey(TOKEN_ADDRESS);
+
+                // トークンアカウントを検索
+                const tokenAccounts = await connection.getTokenAccountsByOwner(
+                    walletPublicKey,
+                    { mint: tokenMintPublicKey }
+                );
+
+                console.log('Token accounts found:', tokenAccounts.value.length);
+
+                if (tokenAccounts.value.length > 0) {
+                    // トークンアカウントのデータをデコード
+                    const accountInfo = tokenAccounts.value[0];
+                    const accountData = accountInfo.account.data;
+                    
+                    // Token Account のデータ構造から残高を取得
+                    // オフセット64から8バイトが残高（little-endian）
+                    const dataView = new DataView(accountData.buffer, accountData.byteOffset);
+                    const amount = dataView.getBigUint64(64, true); // little-endian
+                    
+                    // decimalsを取得するために mint 情報を取得
+                    const mintInfo = await connection.getParsedAccountInfo(tokenMintPublicKey);
+                    const decimals = mintInfo.value?.data?.parsed?.info?.decimals || 0;
+                    
+                    // 実際の残高を計算
+                    const balance = Number(amount) / Math.pow(10, decimals);
+                    
+                    console.log('Token balance:', balance);
+                    
+                    // 残高を表示（カンマ区切り）
+                    balanceElement.textContent = formatNumber(balance);
+                    
+                    // 液体のレベルを更新（最大90%まで）
+                    const liquidLevel = Math.min(90, (balance / TARGET_BALANCE) * 100);
+                    liquidElement.style.height = liquidLevel + '%';
+                    
+                    // 残高が増えた場合、コインが落ちて溶ける演出
+                    if (balance > previousBalance && previousBalance > 0) {
+                        const diff = balance - previousBalance;
+                        const coinCount = Math.min(15, Math.max(3, Math.floor(diff / 10000) + 3));
+                        
+                        // 炎を強くする
+                        flameElement.classList.add('intense');
+                        
+                        // コインを落とす
+                        addMeltingCoins(coinCount);
+                        
+                        // 3秒後に炎を元に戻す
+                        setTimeout(() => {
+                            flameElement.classList.remove('intense');
+                        }, 3000);
+                    }
+                    
+                    previousBalance = balance;
+                    
+                } else {
+                    console.log('No token accounts found');
+                    balanceElement.textContent = '0';
+                    liquidElement.style.height = '0%';
+                    previousBalance = 0;
+                }
+
+                // 最終更新時刻を表示
+                const now = new Date();
+                lastUpdatedElement.textContent = `最終更新: ${now.toLocaleString('ja-JP')}`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                balanceElement.textContent = '---';
+                errorElement.textContent = `エラー: ${error.message}`;
+                errorElement.style.display = 'block';
+            }
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString('ja-JP', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function addMeltingCoins(count) {
+            const container = document.getElementById('coinContainer');
+            
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    const coin = document.createElement('div');
+                    coin.className = 'coin';
+                    
+                    // ランダムな位置から落下
+                    const leftPosition = 30 + Math.random() * 40;
+                    coin.style.left = `${leftPosition}%`;
+                    coin.style.top = '0';
+                    
+                    container.appendChild(coin);
+                    
+                    // 2.5秒後にコインを削除
+                    setTimeout(() => {
+                        coin.remove();
+                    }, 2500);
+                }, i * 150);
+            }
+        }
+
+        // 初回読み込み
+        fetchBalance();
+
+        // 30秒ごとに自動更新
+        setInterval(fetchBalance, 30000);
+
+        // ページ読み込み時に初期の液体レベルを設定
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const liquidElement = document.getElementById('liquid');
+                if (previousBalance === 0) {
+                    liquidElement.style.height = '5%'; // 初期状態として少し液体を表示
+                }
+            }, 500);
+        });
     </script>
-  </body>
+</body>
 </html>
